@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { supabase, formatRupiah, formatTanggalIndo } from '@/lib/supabase';
+import ProfitLossBackupModal from '@/components/ProfitLossBackupModal';
 
 // --- TIPE DATA ---
 interface Product {
@@ -560,7 +561,7 @@ export default function KasirFrozenPro() {
               <h1 className="text-lg font-bold tracking-tight text-slate-900">
                 FROZENPRO <span className="text-red-600">POS</span>
               </h1>
-              <p className="text-xs text-slate-500">Manajemen Kasir & Gudang Beku</p>
+              <p className="text-xs text-slate-500">Manajemen Kasir &amp; Gudang Beku</p>
             </div>
           </div>
 
@@ -868,7 +869,7 @@ export default function KasirFrozenPro() {
               <div className="space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200">
                   <div>
-                    <h2 className="text-base font-bold text-slate-900">Katalog & Stok Produk</h2>
+                    <h2 className="text-base font-bold text-slate-900">Katalog &amp; Stok Produk</h2>
                     <p className="text-xs text-slate-500">
                       Kelola kode barcode, harga modal (HPP), harga jual, dan stok
                     </p>
@@ -1056,7 +1057,7 @@ export default function KasirFrozenPro() {
                   <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
                     <div className="p-4 border-b border-slate-200">
                       <h3 className="text-sm font-bold text-slate-900">
-                        Riwayat Barang Masuk, Keluar & Retur
+                        Riwayat Barang Masuk, Keluar &amp; Retur
                       </h3>
                     </div>
                     <div className="overflow-x-auto">
@@ -1129,6 +1130,12 @@ export default function KasirFrozenPro() {
             ========================================================= */}
             {activeTab === 'laporan' && (
               <div className="space-y-6">
+                <ProfitLossBackupModal
+                  transactions={transactions}
+                  products={products}
+                  storeName="FROZENPRO POS"
+                />
+
                 <div className="bg-white p-4 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
                     <h2 className="text-base font-bold text-slate-900">Laporan Laba Rugi</h2>
@@ -1328,11 +1335,11 @@ export default function KasirFrozenPro() {
                     onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
                     className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg"
                   >
-                    <option value="Nugget & Olahan Ayam">Nugget & Olahan Ayam</option>
+                    <option value="Nugget & Olahan Ayam">Nugget &amp; Olahan Ayam</option>
                     <option value="Sosis">Sosis</option>
-                    <option value="Seafood & Steamboat">Seafood & Steamboat</option>
-                    <option value="Dimsum & Bakpao">Dimsum & Bakpao</option>
-                    <option value="Kentang & Camilan">Kentang & Camilan</option>
+                    <option value="Seafood & Steamboat">Seafood &amp; Steamboat</option>
+                    <option value="Dimsum & Bakpao">Dimsum &amp; Bakpao</option>
+                    <option value="Kentang & Camilan">Kentang &amp; Camilan</option>
                     <option value="Daging Olahan">Daging Olahan</option>
                   </select>
                 </div>
