@@ -110,7 +110,7 @@ export default function KasirFrozenPro() {
 
   // State Kamera Scan Barcode
   const [showScannerModal, setShowScannerModal] = useState<boolean>(false);
-  const [scannerStatus, setScannerStatus] = useState<string>('Arahkan kamera ke kode barcode produk...');
+  const [scannerStatus, setScannerStatus] = useState<string>('Arahkan kamera ke barcode produk...');
   const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
   const isHandlingScanRef = useRef<boolean>(false);
 
@@ -128,7 +128,7 @@ export default function KasirFrozenPro() {
     min_stock: '5',
   });
 
-  // State Form Mutasi Stok
+  // State Form Perubahan Stok
   const [mutationForm, setMutationForm] = useState({
     product_id: '',
     type: 'MASUK' as 'MASUK' | 'KELUAR' | 'RETUR_CUSTOMER' | 'RETUR_SUPPLIER',
@@ -152,7 +152,7 @@ export default function KasirFrozenPro() {
     setNotif({ show: true, title, message, type });
   };
 
-  // --- FETCH DATA DARI SUPABASE ---
+  // --- AMBIL DATA DARI SUPABASE ---
   const fetchAllData = async () => {
     setLoading(true);
     try {
@@ -167,7 +167,7 @@ export default function KasirFrozenPro() {
       if (mutRes.data) setMutations(mutRes.data);
     } catch (err) {
       console.error(err);
-      showNotif('Koneksi Gagal', 'Gagal memuat data dari database Supabase.', 'error');
+      showNotif('Koneksi Gagal', 'Gagal memuat data dari database.', 'error');
     } finally {
       setLoading(false);
     }
@@ -188,10 +188,10 @@ export default function KasirFrozenPro() {
     fetchAllData();
   }, []);
 
-  // --- LOGIKA KERANJANG KASIR ---
+  // --- KERANJANG KASIR ---
   const addToCart = (product: Product) => {
     if (product.stock <= 0) {
-      showNotif('Stok Habis', `Stok ${product.name} saat ini kosong (0).`, 'warning');
+      showNotif('Stok Habis', `Stok ${product.name} sedang kosong (0).`, 'warning');
       return;
     }
 
@@ -199,7 +199,7 @@ export default function KasirFrozenPro() {
       const existing = prev.find((item) => item.id === product.id);
       if (existing) {
         if (existing.qty + 1 > product.stock) {
-          showNotif('Batas Stok', `Maksimal stok tersedia untuk ${product.name} adalah ${product.stock}.`, 'warning');
+          showNotif('Batas Stok', `Stok ${product.name} hanya tersisa ${product.stock}.`, 'warning');
           return prev;
         }
         return prev.map((item) =>
@@ -223,7 +223,7 @@ export default function KasirFrozenPro() {
       }
       showNotif(
         'Barcode Terbaca',
-        `${found.name} (${cleanCode}) ditambahkan ke keranjang.`,
+        `${found.name} (${cleanCode}) masuk ke keranjang.`,
         'success'
       );
     } else {
@@ -233,7 +233,7 @@ export default function KasirFrozenPro() {
       }
       showNotif(
         'Barcode Belum Terdaftar',
-        `Kode ${cleanCode} tidak ditemukan di data produk. Isi kolom Barcode pada menu Stok Produk.`,
+        `Kode ${cleanCode} belum ada di daftar barang. Isi kolom Barcode di menu Stok Barang.`,
         'warning'
       );
     }
@@ -246,7 +246,7 @@ export default function KasirFrozenPro() {
     }
   };
 
-  // --- LOGIKA SCANNER KAMERA BARCODE ---
+  // --- SCANNER KAMERA BARCODE ---
   const startBarcodeScanner = async () => {
     isHandlingScanRef.current = false;
     setScannerStatus('Membuka kamera barcode...');
@@ -269,14 +269,14 @@ export default function KasirFrozenPro() {
             handleBarcodeMatch(decodedText, true);
           },
           () => {
-            setScannerStatus('Arahkan garis pindai tepat ke kode barcode...');
+            setScannerStatus('Arahkan garis pindai tepat ke barcode...');
           }
         );
       } catch {
         setShowScannerModal(false);
         showNotif(
           'Kamera Tidak Dapat Diakses',
-          'Pastikan izin kamera browser aktif dan halaman dibuka melalui HTTPS (atau localhost).',
+          'Pastikan izin kamera aktif dan halaman dibuka lewat HTTPS atau localhost.',
           'error'
         );
       }
@@ -336,11 +336,11 @@ export default function KasirFrozenPro() {
 
   const handleCheckout = async () => {
     if (cart.length === 0) {
-      showNotif('Keranjang Kosong', 'Pilih minimal satu produk frozen food terlebih dahulu.', 'warning');
+      showNotif('Keranjang Kosong', 'Pilih minimal satu barang terlebih dahulu.', 'warning');
       return;
     }
     if (paymentMethod === 'Tunai' && cashNumeric < cartTotal) {
-      showNotif('Pembayaran Kurang', 'Nominal uang tunai yang diterima lebih kecil dari total belanja.', 'warning');
+      showNotif('Uang Kurang', 'Uang yang diterima masih kurang dari total belanja.', 'warning');
       return;
     }
 
@@ -400,13 +400,13 @@ export default function KasirFrozenPro() {
       await fetchAllData();
     } catch (err) {
       console.error(err);
-      showNotif('Transaksi Gagal', 'Terjadi kesalahan saat menyimpan transaksi ke server.', 'error');
+      showNotif('Transaksi Gagal', 'Gagal menyimpan transaksi ke database.', 'error');
     } finally {
       setIsProcessingCheckout(false);
     }
   };
 
-  // --- LOGIKA MASTER PRODUK ---
+  // --- KELOLA BARANG & STOK ---
   const openAddProduct = () => {
     setEditingProduct(null);
     setProductForm({
@@ -458,16 +458,16 @@ export default function KasirFrozenPro() {
           .update(payload)
           .eq('id', editingProduct.id);
         if (error) throw error;
-        showNotif('Produk Diperbarui', `${payload.name} berhasil disimpan.`, 'success');
+        showNotif('Barang Diperbarui', `${payload.name} berhasil disimpan.`, 'success');
       } else {
         const { error } = await supabase.from('products').insert(payload);
         if (error) throw error;
-        showNotif('Produk Ditambahkan', `${payload.name} masuk ke katalog stok.`, 'success');
+        showNotif('Barang Ditambahkan', `${payload.name} masuk ke daftar stok.`, 'success');
       }
       setShowProductModal(false);
       await fetchAllData();
     } catch {
-      showNotif('Gagal Menyimpan', 'Periksa input produk atau pastikan nomor barcode tidak kembar.', 'error');
+      showNotif('Gagal Menyimpan', 'Periksa isian barang atau pastikan kode barcode tidak kembar.', 'error');
     }
   };
 
@@ -475,21 +475,21 @@ export default function KasirFrozenPro() {
     try {
       const { error } = await supabase.from('products').delete().eq('id', prod.id);
       if (error) throw error;
-      showNotif('Produk Dihapus', `${prod.name} telah dihapus dari sistem.`, 'success');
+      showNotif('Barang Dihapus', `${prod.name} telah dihapus.`, 'success');
       await fetchAllData();
     } catch {
-      showNotif('Tidak Dapat Menghapus', 'Produk sudah terhubung dengan riwayat transaksi.', 'error');
+      showNotif('Tidak Bisa Dihapus', 'Barang sudah tercatat di riwayat transaksi.', 'error');
     }
   };
 
-  // --- LOGIKA MUTASI STOK (MASUK / KELUAR / RETUR) ---
+  // --- PERUBAHAN STOK (MASUK / KELUAR / KEMBALI) ---
   const handleSaveMutation = async (e: React.FormEvent) => {
     e.preventDefault();
     const targetProd = products.find((p) => p.id === mutationForm.product_id);
     const qtyNum = Number(mutationForm.qty);
 
     if (!targetProd || qtyNum <= 0) {
-      showNotif('Input Tidak Valid', 'Pilih produk dan masukkan jumlah yang benar.', 'warning');
+      showNotif('Data Belum Lengkap', 'Pilih barang dan isi jumlah yang benar.', 'warning');
       return;
     }
 
@@ -497,7 +497,7 @@ export default function KasirFrozenPro() {
     const newStock = isAddition ? targetProd.stock + qtyNum : targetProd.stock - qtyNum;
 
     if (newStock < 0) {
-      showNotif('Stok Tidak Cukup', `Stok ${targetProd.name} saat ini hanya ${targetProd.stock}.`, 'warning');
+      showNotif('Stok Kurang', `Stok ${targetProd.name} tinggal ${targetProd.stock}.`, 'warning');
       return;
     }
 
@@ -518,14 +518,14 @@ export default function KasirFrozenPro() {
       if (prodError) throw prodError;
 
       setMutationForm({ product_id: '', type: 'MASUK', qty: '', note: '' });
-      showNotif('Mutasi Tercatat', `Stok ${targetProd.name} berhasil diperbarui menjadi ${newStock}.`, 'success');
+      showNotif('Stok Tersimpan', `Stok ${targetProd.name} sekarang menjadi ${newStock}.`, 'success');
       await fetchAllData();
     } catch {
-      showNotif('Gagal Mencatat Mutasi', 'Terjadi kesalahan pada database.', 'error');
+      showNotif('Gagal Menyimpan', 'Terjadi kendala saat menyimpan perubahan stok.', 'error');
     }
   };
 
-  // --- FILTERING PRODUK & LAPORAN ---
+  // --- FILTER BARANG & LAPORAN ---
   const categories = ['Semua', ...Array.from(new Set(products.map((p) => p.category)))];
 
   const filteredProducts = products.filter((p) => {
@@ -561,16 +561,16 @@ export default function KasirFrozenPro() {
               <h1 className="text-lg font-bold tracking-tight text-slate-900">
                 FROZENPRO <span className="text-red-600">POS</span>
               </h1>
-              <p className="text-xs text-slate-500">Manajemen Kasir &amp; Gudang Beku</p>
+              <p className="text-xs text-slate-500">Kasir &amp; Stok Barang Beku</p>
             </div>
           </div>
 
           <nav className="flex items-center gap-1 sm:gap-2">
             {[
               { id: 'kasir', label: 'Kasir', icon: ShoppingCart },
-              { id: 'produk', label: 'Stok Produk', icon: Package, badge: lowStockCount },
-              { id: 'mutasi', label: 'Masuk / Keluar / Retur', icon: ArrowLeftRight },
-              { id: 'laporan', label: 'Laporan Laba Rugi', icon: BarChart3 },
+              { id: 'produk', label: 'Stok Barang', icon: Package, badge: lowStockCount },
+              { id: 'mutasi', label: 'Masuk / Keluar / Kembali', icon: ArrowLeftRight },
+              { id: 'laporan', label: 'Laba Rugi & Stok', icon: BarChart3 },
             ].map((menu) => {
               const Icon = menu.icon;
               const isActive = activeTab === menu.id;
@@ -612,19 +612,18 @@ export default function KasirFrozenPro() {
         ) : (
           <>
             {/* =========================================================
-                TAB 1: KASIR + SCAN BARCODE (KAMERA & SCANNER FISIK)
+                TAB 1: KASIR + SCAN BARCODE
             ========================================================= */}
             {activeTab === 'kasir' && (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 <div className="lg:col-span-7 xl:col-span-8 flex flex-col gap-4">
-                  {/* BAR INPUT BARCODE FISIK / KETIK + TOMBOL KAMERA */}
                   <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-3">
                     <div className="flex flex-col sm:flex-row gap-3">
                       <div className="relative flex-1">
                         <ScanBarcode className="w-4 h-4 text-red-600 absolute left-3.5 top-1/2 -translate-y-1/2" />
                         <input
                           type="text"
-                          placeholder="Scan barcode alat / ketik kode lalu tekan Enter..."
+                          placeholder="Tembak barcode / ketik kode lalu tekan Enter..."
                           value={barcodeInput}
                           onChange={(e) => setBarcodeInput(e.target.value)}
                           onKeyDown={handleBarcodeKeyDown}
@@ -637,16 +636,15 @@ export default function KasirFrozenPro() {
                         className="flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium rounded-lg transition-colors shadow-xs"
                       >
                         <ScanBarcode className="w-4 h-4 text-red-400" />
-                        <span>Scan Barcode Kamera</span>
+                        <span>Scan Kamera</span>
                       </button>
                     </div>
 
-                    {/* PENCARIAN NAMA / KODE */}
                     <div className="relative">
                       <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                       <input
                         type="text"
-                        placeholder="Cari nama produk atau nomor barcode..."
+                        placeholder="Cari nama barang atau nomor barcode..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:bg-white"
@@ -654,7 +652,6 @@ export default function KasirFrozenPro() {
                     </div>
                   </div>
 
-                  {/* FILTER KATEGORI */}
                   <div className="flex items-center gap-2 overflow-x-auto pb-1">
                     {categories.map((cat) => (
                       <button
@@ -671,7 +668,6 @@ export default function KasirFrozenPro() {
                     ))}
                   </div>
 
-                  {/* GRID PRODUK FROZEN FOOD */}
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5">
                     {filteredProducts.map((product) => {
                       const isOutOfStock = product.stock <= 0;
@@ -748,8 +744,8 @@ export default function KasirFrozenPro() {
                       {cart.length === 0 ? (
                         <div className="text-center py-12 text-slate-400">
                           <Package className="w-10 h-10 mx-auto mb-2 opacity-40" />
-                          <p className="text-sm">Belum ada produk dipilih</p>
-                          <p className="text-xs mt-1">Klik produk atau scan barcode</p>
+                          <p className="text-sm">Belum ada barang dipilih</p>
+                          <p className="text-xs mt-1">Klik barang atau scan barcode</p>
                         </div>
                       ) : (
                         cart.map((item) => (
@@ -791,7 +787,7 @@ export default function KasirFrozenPro() {
                       <div className="grid grid-cols-2 gap-2">
                         <div>
                           <label className="block text-[11px] font-medium text-slate-500 mb-1">
-                            Nama Pelanggan
+                            Nama Pembeli
                           </label>
                           <input
                             type="text"
@@ -802,7 +798,7 @@ export default function KasirFrozenPro() {
                         </div>
                         <div>
                           <label className="block text-[11px] font-medium text-slate-500 mb-1">
-                            Metode Bayar
+                            Cara Bayar
                           </label>
                           <select
                             value={paymentMethod}
@@ -853,7 +849,7 @@ export default function KasirFrozenPro() {
                       >
                         <CheckCircle2 className="w-4 h-4" />
                         <span>
-                          {isProcessingCheckout ? 'Memproses...' : 'Selesaikan Transaksi'}
+                          {isProcessingCheckout ? 'Menyimpan...' : 'Selesaikan Transaksi'}
                         </span>
                       </button>
                     </div>
@@ -863,15 +859,15 @@ export default function KasirFrozenPro() {
             )}
 
             {/* =========================================================
-                TAB 2: MASTER PRODUK & STOK
+                TAB 2: STOK BARANG
             ========================================================= */}
             {activeTab === 'produk' && (
               <div className="space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200">
                   <div>
-                    <h2 className="text-base font-bold text-slate-900">Katalog &amp; Stok Produk</h2>
+                    <h2 className="text-base font-bold text-slate-900">Daftar &amp; Stok Barang</h2>
                     <p className="text-xs text-slate-500">
-                      Kelola kode barcode, harga modal (HPP), harga jual, dan stok
+                      Atur barcode, harga modal, harga jual, dan jumlah stok
                     </p>
                   </div>
                   <button
@@ -879,7 +875,7 @@ export default function KasirFrozenPro() {
                     className="flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors"
                   >
                     <Plus className="w-4 h-4" />
-                    <span>Tambah Produk Baru</span>
+                    <span>Tambah Barang Baru</span>
                   </button>
                 </div>
 
@@ -888,12 +884,12 @@ export default function KasirFrozenPro() {
                     <table className="w-full text-left border-collapse">
                       <thead>
                         <tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase">
-                          <th className="py-3.5 px-4">Nama Produk</th>
+                          <th className="py-3.5 px-4">Nama Barang</th>
                           <th className="py-3.5 px-4">Barcode</th>
                           <th className="py-3.5 px-4">Kategori</th>
                           <th className="py-3.5 px-4 text-right">Harga Modal</th>
                           <th className="py-3.5 px-4 text-right">Harga Jual</th>
-                          <th className="py-3.5 px-4 text-right">Margin</th>
+                          <th className="py-3.5 px-4 text-right">Untung/Item</th>
                           <th className="py-3.5 px-4 text-center">Sisa Stok</th>
                           <th className="py-3.5 px-4 text-right">Aksi</th>
                         </tr>
@@ -934,14 +930,14 @@ export default function KasirFrozenPro() {
                                   <button
                                     onClick={() => openEditProduct(p)}
                                     className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg"
-                                    title="Edit Produk"
+                                    title="Edit Barang"
                                   >
                                     <Edit3 className="w-4 h-4" />
                                   </button>
                                   <button
                                     onClick={() => handleDeleteProduct(p)}
                                     className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg"
-                                    title="Hapus Produk"
+                                    title="Hapus Barang"
                                   >
                                     <Trash2 className="w-4 h-4" />
                                   </button>
@@ -958,7 +954,7 @@ export default function KasirFrozenPro() {
             )}
 
             {/* =========================================================
-                TAB 3: MUTASI STOK (MASUK / KELUAR / RETUR)
+                TAB 3: MASUK / KELUAR / KEMBALI STOK
             ========================================================= */}
             {activeTab === 'mutasi' && (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -968,15 +964,15 @@ export default function KasirFrozenPro() {
                     className="bg-white p-5 rounded-xl border border-slate-200 space-y-4"
                   >
                     <div>
-                      <h2 className="text-base font-bold text-slate-900">Catat Mutasi Stok</h2>
+                      <h2 className="text-base font-bold text-slate-900">Catat Perubahan Stok</h2>
                       <p className="text-xs text-slate-500">
-                        Barang masuk supplier, keluar rusak, atau retur
+                        Catat barang masuk, barang keluar/rusak, atau barang kembali
                       </p>
                     </div>
 
                     <div>
                       <label className="block text-xs font-medium text-slate-700 mb-1">
-                        Jenis Mutasi
+                        Pilih Jenis Perubahan
                       </label>
                       <select
                         value={mutationForm.type}
@@ -988,16 +984,16 @@ export default function KasirFrozenPro() {
                         }
                         className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500"
                       >
-                        <option value="MASUK">Barang Masuk (Restock Supplier) [+Stok]</option>
-                        <option value="RETUR_CUSTOMER">Retur dari Customer [+Stok]</option>
-                        <option value="KELUAR">Barang Keluar (Rusak / Cair / Sampel) [-Stok]</option>
-                        <option value="RETUR_SUPPLIER">Retur ke Supplier [-Stok]</option>
+                        <option value="MASUK">Barang Masuk (Kulakan / Kiriman Baru) (+Stok)</option>
+                        <option value="RETUR_CUSTOMER">Barang Kembali dari Pembeli (+Stok)</option>
+                        <option value="KELUAR">Barang Keluar (Rusak / Cair / Terpakai) (-Stok)</option>
+                        <option value="RETUR_SUPPLIER">Barang Dikembalikan ke Supplier (-Stok)</option>
                       </select>
                     </div>
 
                     <div>
                       <label className="block text-xs font-medium text-slate-700 mb-1">
-                        Pilih Produk Frozen Food
+                        Pilih Barang
                       </label>
                       <select
                         required
@@ -1007,7 +1003,7 @@ export default function KasirFrozenPro() {
                         }
                         className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500"
                       >
-                        <option value="">-- Pilih Produk --</option>
+                        <option value="">-- Pilih Barang --</option>
                         {products.map((p) => (
                           <option key={p.id} value={p.id}>
                             {p.name} (Sisa: {p.stock} {p.unit})
@@ -1018,7 +1014,7 @@ export default function KasirFrozenPro() {
 
                     <div>
                       <label className="block text-xs font-medium text-slate-700 mb-1">
-                        Jumlah (Qty)
+                        Jumlah Barang
                       </label>
                       <input
                         type="number"
@@ -1037,7 +1033,7 @@ export default function KasirFrozenPro() {
                       </label>
                       <input
                         type="text"
-                        placeholder="Misal: Kiriman distributor / Kemasan sobek"
+                        placeholder="Contoh: Kiriman baru / Plastik robek / Cair"
                         value={mutationForm.note}
                         onChange={(e) => setMutationForm({ ...mutationForm, note: e.target.value })}
                         className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-red-500"
@@ -1048,7 +1044,7 @@ export default function KasirFrozenPro() {
                       type="submit"
                       className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg transition-colors"
                     >
-                      Simpan Mutasi Stok
+                      Simpan Perubahan Stok
                     </button>
                   </form>
                 </div>
@@ -1057,7 +1053,7 @@ export default function KasirFrozenPro() {
                   <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
                     <div className="p-4 border-b border-slate-200">
                       <h3 className="text-sm font-bold text-slate-900">
-                        Riwayat Barang Masuk, Keluar &amp; Retur
+                        Catatan Barang Masuk, Keluar &amp; Kembali
                       </h3>
                     </div>
                     <div className="overflow-x-auto">
@@ -1066,8 +1062,8 @@ export default function KasirFrozenPro() {
                           <tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase">
                             <th className="py-3 px-4">Waktu</th>
                             <th className="py-3 px-4">Jenis</th>
-                            <th className="py-3 px-4">Produk</th>
-                            <th className="py-3 px-4 text-center">Qty</th>
+                            <th className="py-3 px-4">Barang</th>
+                            <th className="py-3 px-4 text-center">Jumlah</th>
                             <th className="py-3 px-4">Keterangan</th>
                           </tr>
                         </thead>
@@ -1075,12 +1071,21 @@ export default function KasirFrozenPro() {
                           {mutations.length === 0 ? (
                             <tr>
                               <td colSpan={5} className="py-8 text-center text-slate-400 text-xs">
-                                Belum ada catatan mutasi stok.
+                                Belum ada catatan perubahan stok.
                               </td>
                             </tr>
                           ) : (
                             mutations.map((m) => {
                               const isPlus = m.type === 'MASUK' || m.type === 'RETUR_CUSTOMER';
+                              const labelJenis =
+                                m.type === 'MASUK'
+                                  ? 'Barang Masuk'
+                                  : m.type === 'RETUR_CUSTOMER'
+                                  ? 'Kembali dari Pembeli'
+                                  : m.type === 'KELUAR'
+                                  ? 'Barang Keluar'
+                                  : 'Dikembalikan ke Supplier';
+
                               return (
                                 <tr key={m.id} className="hover:bg-slate-50">
                                   <td className="py-3 px-4 text-xs text-slate-500 whitespace-nowrap">
@@ -1099,7 +1104,7 @@ export default function KasirFrozenPro() {
                                       {m.type.startsWith('RETUR') && (
                                         <RotateCcw className="w-3 h-3" />
                                       )}
-                                      {m.type.replace('_', ' ')}
+                                      {labelJenis}
                                     </span>
                                   </td>
                                   <td className="py-3 px-4 font-medium text-slate-900">
@@ -1195,7 +1200,7 @@ export default function KasirFrozenPro() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="bg-white p-5 rounded-xl border border-slate-200">
                     <div className="flex items-center justify-between text-slate-500 mb-2">
-                      <span className="text-xs font-semibold uppercase">Total Omzet Penjualan</span>
+                      <span className="text-xs font-semibold uppercase">Total Penjualan</span>
                       <Wallet className="w-5 h-5 text-slate-700" />
                     </div>
                     <p className="text-2xl font-bold text-slate-900">
@@ -1208,23 +1213,23 @@ export default function KasirFrozenPro() {
 
                   <div className="bg-white p-5 rounded-xl border border-slate-200">
                     <div className="flex items-center justify-between text-slate-500 mb-2">
-                      <span className="text-xs font-semibold uppercase">Modal Terjual (HPP)</span>
+                      <span className="text-xs font-semibold uppercase">Modal Barang Terjual</span>
                       <Receipt className="w-5 h-5 text-amber-600" />
                     </div>
                     <p className="text-2xl font-bold text-slate-900">{formatRupiah(totalCOGS)}</p>
-                    <p className="text-xs text-slate-400 mt-1">Harga pokok produk terjual</p>
+                    <p className="text-xs text-slate-400 mt-1">Harga modal produk terjual</p>
                   </div>
 
                   <div className="bg-white p-5 rounded-xl border-2 border-emerald-500/30">
                     <div className="flex items-center justify-between text-emerald-700 mb-2">
-                      <span className="text-xs font-semibold uppercase">Laba Bersih Kotor</span>
+                      <span className="text-xs font-semibold uppercase">Laba Kotor</span>
                       <TrendingUp className="w-5 h-5 text-emerald-600" />
                     </div>
                     <p className="text-2xl font-bold text-emerald-600">
                       {formatRupiah(totalNetProfit)}
                     </p>
                     <p className="text-xs text-slate-500 mt-1">
-                      Margin rata-rata:{' '}
+                      Persen untung:{' '}
                       {totalRevenue > 0 ? Math.round((totalNetProfit / totalRevenue) * 100) : 0}%
                     </p>
                   </div>
@@ -1251,17 +1256,17 @@ export default function KasirFrozenPro() {
 
                 <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
                   <div className="p-4 border-b border-slate-200">
-                    <h3 className="text-sm font-bold text-slate-900">Rincian Transaksi Penjualan</h3>
+                    <h3 className="text-sm font-bold text-slate-900">Rincian Penjualan</h3>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                       <thead>
                         <tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase">
-                          <th className="py-3 px-4">No. Invoice</th>
+                          <th className="py-3 px-4">No. Nota</th>
                           <th className="py-3 px-4">Tanggal &amp; Jam</th>
-                          <th className="py-3 px-4">Pelanggan</th>
-                          <th className="py-3 px-4 text-right">Total Omzet</th>
-                          <th className="py-3 px-4 text-right">HPP</th>
+                          <th className="py-3 px-4">Pembeli</th>
+                          <th className="py-3 px-4 text-right">Total Bayar</th>
+                          <th className="py-3 px-4 text-right">Harga Modal</th>
                           <th className="py-3 px-4 text-right">Laba</th>
                         </tr>
                       </thead>
@@ -1269,7 +1274,7 @@ export default function KasirFrozenPro() {
                         {filteredTransactions.length === 0 ? (
                           <tr>
                             <td colSpan={6} className="py-8 text-center text-slate-400 text-xs">
-                              Tidak ada transaksi pada rentang tanggal ini.
+                              Belum ada transaksi pada tanggal yang dipilih.
                             </td>
                           </tr>
                         ) : (
@@ -1308,7 +1313,7 @@ export default function KasirFrozenPro() {
                 <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
                   <div className="p-4 border-b border-slate-200">
                     <h3 className="text-sm font-bold text-slate-900">
-                      Barang Keluar / Retur Supplier &amp; Harga Modal (HPP)
+                      Barang Keluar / Dikembalikan ke Supplier &amp; Harga Modal
                     </h3>
                   </div>
                   <div className="overflow-x-auto">
@@ -1317,8 +1322,8 @@ export default function KasirFrozenPro() {
                         <tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase">
                           <th className="py-3 px-4">Tanggal &amp; Jam</th>
                           <th className="py-3 px-4">Jenis</th>
-                          <th className="py-3 px-4">Produk</th>
-                          <th className="py-3 px-4 text-center">Qty</th>
+                          <th className="py-3 px-4">Barang</th>
+                          <th className="py-3 px-4 text-center">Jumlah</th>
                           <th className="py-3 px-4 text-right">Harga Modal</th>
                           <th className="py-3 px-4 text-right">Total Modal</th>
                         </tr>
@@ -1346,7 +1351,9 @@ export default function KasirFrozenPro() {
                                   {formatTanggalIndo(m.created_at)}
                                 </td>
                                 <td className="py-3 px-4 text-xs font-semibold text-amber-700">
-                                  {m.type.replace('_', ' ')}
+                                  {m.type === 'KELUAR'
+                                    ? 'Barang Keluar'
+                                    : 'Dikembalikan ke Supplier'}
                                 </td>
                                 <td className="py-3 px-4 font-medium text-slate-900">
                                   {m.product_name}
@@ -1382,7 +1389,7 @@ export default function KasirFrozenPro() {
             <div className="p-4 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <ScanBarcode className="w-5 h-5 text-red-600" />
-                <h3 className="font-bold text-slate-900">Scan Barcode Produk</h3>
+                <h3 className="font-bold text-slate-900">Scan Barcode Barang</h3>
               </div>
               <button
                 onClick={stopBarcodeScanner}
@@ -1403,14 +1410,14 @@ export default function KasirFrozenPro() {
       )}
 
       {/* =========================================================
-          MODAL 2: TAMBAH / EDIT PRODUK
+          MODAL 2: TAMBAH / EDIT BARANG
       ========================================================= */}
       {showProductModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full overflow-hidden shadow-xl">
             <div className="p-4 border-b border-slate-200 flex items-center justify-between">
               <h3 className="font-bold text-slate-900">
-                {editingProduct ? 'Edit Produk Frozen Food' : 'Tambah Produk Baru'}
+                {editingProduct ? 'Edit Barang' : 'Tambah Barang Baru'}
               </h3>
               <button
                 onClick={() => setShowProductModal(false)}
@@ -1421,7 +1428,7 @@ export default function KasirFrozenPro() {
             </div>
             <form onSubmit={handleSaveProduct} className="p-5 space-y-4">
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Nama Produk</label>
+                <label className="block text-xs font-medium text-slate-700 mb-1">Nama Barang</label>
                 <input
                   type="text"
                   required
@@ -1434,7 +1441,7 @@ export default function KasirFrozenPro() {
 
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Kode Barcode (EAN / UPC / Kode Internal)
+                  Kode Barcode (Opsional)
                 </label>
                 <input
                   type="text"
@@ -1476,7 +1483,7 @@ export default function KasirFrozenPro() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1">
-                    Harga Modal / HPP (Rp)
+                    Harga Modal (Rp)
                   </label>
                   <input
                     type="number"
@@ -1513,7 +1520,7 @@ export default function KasirFrozenPro() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1">
-                    Batas Peringatan Stok
+                    Pengingat Stok Menipis
                   </label>
                   <input
                     type="number"
@@ -1537,7 +1544,7 @@ export default function KasirFrozenPro() {
                   type="submit"
                   className="px-5 py-2 text-sm font-semibold bg-red-600 hover:bg-red-700 text-white rounded-lg"
                 >
-                  Simpan Produk
+                  Simpan Barang
                 </button>
               </div>
             </form>
@@ -1568,7 +1575,7 @@ export default function KasirFrozenPro() {
                 <p>{lastReceipt.date}</p>
               </div>
               <div className="border-b border-dashed border-slate-400 pb-2">
-                <p>No: {lastReceipt.invoice_no}</p>
+                <p>Nota: {lastReceipt.invoice_no}</p>
                 <p>Plg: {lastReceipt.customer}</p>
                 <p>Bayar: {lastReceipt.payment}</p>
               </div>
