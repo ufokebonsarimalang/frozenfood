@@ -6,7 +6,7 @@ import {
   Package,
   ArrowLeftRight,
   BarChart3,
-  Camera,
+  ScanBarcode,
   Search,
   Plus,
   Minus,
@@ -25,19 +25,20 @@ import {
   ArrowUpRight,
   RotateCcw,
 } from 'lucide-react';
+import { Html5Qrcode } from 'html5-qrcode';
 import { supabase, formatRupiah, formatTanggalIndo } from '@/lib/supabase';
 
 // --- TIPE DATA ---
 interface Product {
   id: string;
   name: string;
+  barcode?: string | null;
   category: string;
   unit: string;
   buy_price: number;
   sell_price: number;
   stock: number;
   min_stock: number;
-  image_hint?: string;
 }
 
 interface CartItem extends Product {
@@ -83,8 +84,9 @@ export default function KasirFrozenPro() {
   const [mutations, setMutations] = useState<StockMutation[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // State Kasir
+  // State Kasir & Barcode
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [barcodeInput, setBarcodeInput] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Semua');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customerName, setCustomerName] = useState<string>('Pelanggan Umum');
@@ -105,25 +107,24 @@ export default function KasirFrozenPro() {
   } | null>(null);
   const [showReceiptModal, setShowReceiptModal] = useState<boolean>(false);
 
-  // State Kamera Scan Tanpa Barcode
-  const [showCameraModal, setShowCameraModal] = useState<boolean>(false);
-  const [isScanning, setIsScanning] = useState<boolean>(false);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  // State Kamera Scan Barcode
+  const [showScannerModal, setShowScannerModal] = useState<boolean>(false);
+  const [scannerStatus, setScannerStatus] = useState<string>('Arahkan kamera ke kode barcode produk...');
+  const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
+  const isHandlingScanRef = useRef<boolean>(false);
 
   // State Modal Produk (Tambah / Edit)
   const [showProductModal, setShowProductModal] = useState<boolean>(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [productForm, setProductForm] = useState({
     name: '',
+    barcode: '',
     category: 'Nugget & Olahan Ayam',
     unit: 'Pack',
     buy_price: '',
     sell_price: '',
     stock: '',
     min_stock: '5',
-    image_hint: '',
   });
 
   // State Form Mutasi Stok
@@ -138,7 +139,7 @@ export default function KasirFrozenPro() {
   const [reportStartDate, setReportStartDate] = useState<string>('');
   const [reportEndDate, setReportEndDate] = useState<string>('');
 
-  // State Modal Notifikasi Kustom (Tanpa Alert Bawaan Browser)
+  // State Modal Notifikasi Kustom
   const [notif, setNotif] = useState<ModalNotification>({
     show: false,
     title: '',
@@ -186,93 +187,6 @@ export default function KasirFrozenPro() {
     fetchAllData();
   }, []);
 
-  // --- LOGIKA KAMERA SCAN TANPA BARCODE ---
-  const startCamera = async () => {
-    setShowCameraModal(true);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' },
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-    } catch {
-      setShowCameraModal(false);
-      showNotif(
-        'Akses Kamera Ditolak',
-        'Pastikan izin kamera di browser aktif dan menggunakan koneksi HTTPS.',
-        'error'
-      );
-    }
-  };
-
-  const stopCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
-    setShowCameraModal(false);
-  };
-
-  const captureAndIdentify = async () => {
-    if (!videoRef.current || !canvasRef.current) return;
-    setIsScanning(true);
-
-    try {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      canvas.width = video.videoWidth || 640;
-      canvas.height = video.videoHeight || 480;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const imageBase64 = canvas.toDataURL('image/jpeg', 0.8);
-
-      const response = await fetch('/api/scan-product', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          imageBase64,
-          products: products.map((p) => ({
-            id: p.id,
-            name: p.name,
-            category: p.category,
-            image_hint: p.image_hint,
-          })),
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.matchedProductId) {
-        const matched = products.find((p) => p.id === data.matchedProductId);
-        if (matched) {
-          addToCart(matched);
-          stopCamera();
-          showNotif(
-            'Produk Dikenali',
-            `${matched.name} berhasil ditambahkan ke keranjang (${data.confidence}).`,
-            'success'
-          );
-        } else {
-          showNotif('Tidak Ditemukan', 'Produk terdeteksi namun tidak cocok dengan stok aktif.', 'warning');
-        }
-      } else {
-        showNotif(
-          'Kemasan Belum Dikenali',
-          `Terdeteksi: ${data.detectedName || 'Tidak jelas'}. Coba arahkan kemasan lebih dekat ke kamera.`,
-          'warning'
-        );
-      }
-    } catch {
-      showNotif('Gagal Memindai', 'Terjadi kesalahan saat menganalisis gambar produk.', 'error');
-    } finally {
-      setIsScanning(false);
-    }
-  };
-
   // --- LOGIKA KERANJANG KASIR ---
   const addToCart = (product: Product) => {
     if (product.stock <= 0) {
@@ -294,6 +208,104 @@ export default function KasirFrozenPro() {
       return [...prev, { ...product, qty: 1 }];
     });
   };
+
+  const handleBarcodeMatch = (rawCode: string, closeCameraAfter = false) => {
+    const cleanCode = rawCode.trim();
+    if (!cleanCode) return;
+
+    const found = products.find((p) => (p.barcode || '').trim() === cleanCode);
+    if (found) {
+      addToCart(found);
+      setBarcodeInput('');
+      if (closeCameraAfter) {
+        stopBarcodeScanner();
+      }
+      showNotif(
+        'Barcode Terbaca',
+        `${found.name} (${cleanCode}) ditambahkan ke keranjang.`,
+        'success'
+      );
+    } else {
+      setBarcodeInput('');
+      if (closeCameraAfter) {
+        stopBarcodeScanner();
+      }
+      showNotif(
+        'Barcode Belum Terdaftar',
+        `Kode ${cleanCode} tidak ditemukan di data produk. Isi kolom Barcode pada menu Stok Produk.`,
+        'warning'
+      );
+    }
+  };
+
+  const handleBarcodeKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleBarcodeMatch(barcodeInput, false);
+    }
+  };
+
+  // --- LOGIKA SCANNER KAMERA BARCODE ---
+  const startBarcodeScanner = async () => {
+    isHandlingScanRef.current = false;
+    setScannerStatus('Membuka kamera barcode...');
+    setShowScannerModal(true);
+
+    setTimeout(async () => {
+      try {
+        const scanner = new Html5Qrcode('barcode-reader-box');
+        html5QrCodeRef.current = scanner;
+
+        await scanner.start(
+          { facingMode: 'environment' },
+          {
+            fps: 10,
+            qrbox: { width: 260, height: 150 },
+          },
+          (decodedText) => {
+            if (isHandlingScanRef.current) return;
+            isHandlingScanRef.current = true;
+            handleBarcodeMatch(decodedText, true);
+          },
+          () => {
+            setScannerStatus('Arahkan garis pindai tepat ke kode barcode...');
+          }
+        );
+      } catch {
+        setShowScannerModal(false);
+        showNotif(
+          'Kamera Tidak Dapat Diakses',
+          'Pastikan izin kamera browser aktif dan halaman dibuka melalui HTTPS (atau localhost).',
+          'error'
+        );
+      }
+    }, 150);
+  };
+
+  const stopBarcodeScanner = async () => {
+    const scanner = html5QrCodeRef.current;
+    html5QrCodeRef.current = null;
+    setShowScannerModal(false);
+
+    if (scanner) {
+      try {
+        if (scanner.isScanning) {
+          await scanner.stop();
+        }
+        scanner.clear();
+      } catch {
+        // Abaikan error saat menutup kamera
+      }
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
+        html5QrCodeRef.current.stop().catch(() => {});
+      }
+    };
+  }, []);
 
   const updateCartQty = (id: string, delta: number) => {
     setCart((prev) =>
@@ -398,13 +410,13 @@ export default function KasirFrozenPro() {
     setEditingProduct(null);
     setProductForm({
       name: '',
+      barcode: '',
       category: 'Nugget & Olahan Ayam',
       unit: 'Pack',
       buy_price: '',
       sell_price: '',
       stock: '',
       min_stock: '5',
-      image_hint: '',
     });
     setShowProductModal(true);
   };
@@ -413,28 +425,29 @@ export default function KasirFrozenPro() {
     setEditingProduct(prod);
     setProductForm({
       name: prod.name,
+      barcode: prod.barcode || '',
       category: prod.category,
       unit: prod.unit,
       buy_price: String(prod.buy_price),
       sell_price: String(prod.sell_price),
       stock: String(prod.stock),
       min_stock: String(prod.min_stock),
-      image_hint: prod.image_hint || '',
     });
     setShowProductModal(true);
   };
 
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
+    const cleanBarcode = productForm.barcode.trim();
     const payload = {
       name: productForm.name.trim(),
+      barcode: cleanBarcode || null,
       category: productForm.category,
       unit: productForm.unit,
       buy_price: Number(productForm.buy_price),
       sell_price: Number(productForm.sell_price),
       stock: Number(productForm.stock),
       min_stock: Number(productForm.min_stock),
-      image_hint: productForm.image_hint.trim(),
     };
 
     try {
@@ -453,7 +466,7 @@ export default function KasirFrozenPro() {
       setShowProductModal(false);
       await fetchAllData();
     } catch {
-      showNotif('Gagal Menyimpan', 'Periksa kembali input harga dan stok produk.', 'error');
+      showNotif('Gagal Menyimpan', 'Periksa input produk atau pastikan nomor barcode tidak kembar.', 'error');
     }
   };
 
@@ -515,7 +528,9 @@ export default function KasirFrozenPro() {
   const categories = ['Semua', ...Array.from(new Set(products.map((p) => p.category)))];
 
   const filteredProducts = products.filter((p) => {
-    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const q = searchQuery.toLowerCase();
+    const matchesSearch =
+      p.name.toLowerCase().includes(q) || (p.barcode || '').toLowerCase().includes(q);
     const matchesCat = selectedCategory === 'Semua' || p.category === selectedCategory;
     return matchesSearch && matchesCat;
   });
@@ -549,7 +564,6 @@ export default function KasirFrozenPro() {
             </div>
           </div>
 
-          {/* MENU NAVIGASI */}
           <nav className="flex items-center gap-1 sm:gap-2">
             {[
               { id: 'kasir', label: 'Kasir', icon: ShoppingCart },
@@ -597,30 +611,46 @@ export default function KasirFrozenPro() {
         ) : (
           <>
             {/* =========================================================
-                TAB 1: KASIR (POINT OF SALE) + VISUAL SCAN TANPA BARCODE
+                TAB 1: KASIR + SCAN BARCODE (KAMERA & SCANNER FISIK)
             ========================================================= */}
             {activeTab === 'kasir' && (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {/* KIRI: KATALOG PRODUK & SCAN */}
                 <div className="lg:col-span-7 xl:col-span-8 flex flex-col gap-4">
-                  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row gap-3">
-                    <div className="relative flex-1">
+                  {/* BAR INPUT BARCODE FISIK / KETIK + TOMBOL KAMERA */}
+                  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-3">
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <div className="relative flex-1">
+                        <ScanBarcode className="w-4 h-4 text-red-600 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          placeholder="Scan barcode alat / ketik kode lalu tekan Enter..."
+                          value={barcodeInput}
+                          onChange={(e) => setBarcodeInput(e.target.value)}
+                          onKeyDown={handleBarcodeKeyDown}
+                          className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-red-500 focus:bg-white"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={startBarcodeScanner}
+                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium rounded-lg transition-colors shadow-xs"
+                      >
+                        <ScanBarcode className="w-4 h-4 text-red-400" />
+                        <span>Scan Barcode Kamera</span>
+                      </button>
+                    </div>
+
+                    {/* PENCARIAN NAMA / KODE */}
+                    <div className="relative">
                       <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                       <input
                         type="text"
-                        placeholder="Cari nama nugget, sosis, dimsum..."
+                        placeholder="Cari nama produk atau nomor barcode..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:bg-white"
+                        className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:bg-white"
                       />
                     </div>
-                    <button
-                      onClick={startCamera}
-                      className="flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium rounded-lg transition-colors shadow-xs"
-                    >
-                      <Camera className="w-4 h-4 text-red-400" />
-                      <span>Scan Tanpa Barcode</span>
-                    </button>
                   </div>
 
                   {/* FILTER KATEGORI */}
@@ -676,6 +706,11 @@ export default function KasirFrozenPro() {
                             <h3 className="font-semibold text-sm text-slate-900 line-clamp-2 leading-snug">
                               {product.name}
                             </h3>
+                            {product.barcode && (
+                              <p className="text-[11px] text-slate-400 font-mono mt-1 truncate">
+                                {product.barcode}
+                              </p>
+                            )}
                           </div>
 
                           <div className="mt-4 pt-3 border-t border-slate-100 flex items-baseline justify-between">
@@ -713,7 +748,7 @@ export default function KasirFrozenPro() {
                         <div className="text-center py-12 text-slate-400">
                           <Package className="w-10 h-10 mx-auto mb-2 opacity-40" />
                           <p className="text-sm">Belum ada produk dipilih</p>
-                          <p className="text-xs mt-1">Klik produk atau gunakan Scan Kamera</p>
+                          <p className="text-xs mt-1">Klik produk atau scan barcode</p>
                         </div>
                       ) : (
                         cart.map((item) => (
@@ -835,7 +870,7 @@ export default function KasirFrozenPro() {
                   <div>
                     <h2 className="text-base font-bold text-slate-900">Katalog & Stok Produk</h2>
                     <p className="text-xs text-slate-500">
-                      Kelola harga modal (HPP), harga jual, dan ciri kemasan untuk scan kamera
+                      Kelola kode barcode, harga modal (HPP), harga jual, dan stok
                     </p>
                   </div>
                   <button
@@ -853,6 +888,7 @@ export default function KasirFrozenPro() {
                       <thead>
                         <tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase">
                           <th className="py-3.5 px-4">Nama Produk</th>
+                          <th className="py-3.5 px-4">Barcode</th>
                           <th className="py-3.5 px-4">Kategori</th>
                           <th className="py-3.5 px-4 text-right">Harga Modal</th>
                           <th className="py-3.5 px-4 text-right">Harga Jual</th>
@@ -867,11 +903,9 @@ export default function KasirFrozenPro() {
                           const isLow = p.stock <= p.min_stock;
                           return (
                             <tr key={p.id} className="hover:bg-slate-50/80">
-                              <td className="py-3 px-4">
-                                <p className="font-semibold text-slate-900">{p.name}</p>
-                                {p.image_hint && (
-                                  <p className="text-xs text-slate-400">Ciri Scan: {p.image_hint}</p>
-                                )}
+                              <td className="py-3 px-4 font-semibold text-slate-900">{p.name}</td>
+                              <td className="py-3 px-4 font-mono text-xs text-slate-600">
+                                {p.barcode || '-'}
                               </td>
                               <td className="py-3 px-4 text-slate-600">{p.category}</td>
                               <td className="py-3 px-4 text-right text-slate-600">
@@ -1215,50 +1249,29 @@ export default function KasirFrozenPro() {
       </main>
 
       {/* =========================================================
-          MODAL 1: KAMERA SCAN PRODUK TANPA BARCODE
+          MODAL 1: KAMERA SCAN BARCODE
       ========================================================= */}
-      {showCameraModal && (
+      {showScannerModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full overflow-hidden shadow-xl">
             <div className="p-4 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Camera className="w-5 h-5 text-red-600" />
-                <h3 className="font-bold text-slate-900">Scan Kemasan Tanpa Barcode</h3>
+                <ScanBarcode className="w-5 h-5 text-red-600" />
+                <h3 className="font-bold text-slate-900">Scan Barcode Produk</h3>
               </div>
-              <button onClick={stopCamera} className="p-1 text-slate-400 hover:text-slate-700">
+              <button
+                onClick={stopBarcodeScanner}
+                className="p-1 text-slate-400 hover:text-slate-700"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-4 space-y-4">
-              <div className="relative bg-slate-950 rounded-xl overflow-hidden aspect-video">
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  className="w-full h-full object-cover"
-                />
-                <canvas ref={canvasRef} className="hidden" />
-              </div>
-              <p className="text-xs text-slate-500 text-center">
-                Arahkan bagian depan kemasan frozen food ke kamera, lalu tekan tombol deteksi.
-              </p>
-              <button
-                onClick={captureAndIdentify}
-                disabled={isScanning}
-                className="w-full py-3 bg-red-600 hover:bg-red-700 disabled:bg-slate-400 text-white font-semibold text-sm rounded-xl flex items-center justify-center gap-2"
-              >
-                {isScanning ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Mengenali Kemasan...</span>
-                  </>
-                ) : (
-                  <>
-                    <Camera className="w-4 h-4" />
-                    <span>Identifikasi & Masukkan Keranjang</span>
-                  </>
-                )}
-              </button>
+            <div className="p-4 space-y-3">
+              <div
+                id="barcode-reader-box"
+                className="w-full rounded-xl overflow-hidden bg-slate-950 min-h-[240px]"
+              />
+              <p className="text-xs text-slate-500 text-center">{scannerStatus}</p>
             </div>
           </div>
         </div>
@@ -1291,6 +1304,19 @@ export default function KasirFrozenPro() {
                   value={productForm.name}
                   onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
                   className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Kode Barcode (EAN / UPC / Kode Internal)
+                </label>
+                <input
+                  type="text"
+                  placeholder="Contoh: 8991001000011"
+                  value={productForm.barcode}
+                  onChange={(e) => setProductForm({ ...productForm, barcode: e.target.value })}
+                  className="w-full px-3 py-2 text-sm font-mono border border-slate-200 rounded-lg"
                 />
               </div>
 
@@ -1372,19 +1398,6 @@ export default function KasirFrozenPro() {
                     className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg"
                   />
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Ciri Visual Kemasan (Untuk Akurasi Scan Kamera)
-                </label>
-                <input
-                  type="text"
-                  placeholder="Contoh: Kemasan merah biru tulisan bubble nugget"
-                  value={productForm.image_hint}
-                  onChange={(e) => setProductForm({ ...productForm, image_hint: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg"
-                />
               </div>
 
               <div className="pt-2 flex justify-end gap-2">
@@ -1486,7 +1499,7 @@ export default function KasirFrozenPro() {
       )}
 
       {/* =========================================================
-          MODAL 4: NOTIFIKASI POPUP KUSTOM (PENGGANTI ALERT BROWSER)
+          MODAL 4: NOTIFIKASI POPUP KUSTOM
       ========================================================= */}
       {notif.show && (
         <div className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
