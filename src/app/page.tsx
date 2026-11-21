@@ -75,6 +75,15 @@ interface ModalNotification {
   type: 'success' | 'error' | 'warning';
 }
 
+const DEFAULT_CATEGORIES = [
+  'Nugget & Olahan Ayam',
+  'Sosis',
+  'Seafood & Steamboat',
+  'Dimsum & Bakpao',
+  'Kentang & Camilan',
+  'Daging Olahan',
+];
+
 export default function KasirFrozenPro() {
   // Navigasi Menu Utama
   const [activeTab, setActiveTab] = useState<'kasir' | 'produk' | 'mutasi' | 'laporan'>('kasir');
@@ -110,7 +119,7 @@ export default function KasirFrozenPro() {
 
   // State Kamera Scan Barcode
   const [showScannerModal, setShowScannerModal] = useState<boolean>(false);
-  const [scannerStatus, setScannerStatus] = useState<string>('Arahkan kamera ke barcode produk...');
+  const [scannerStatus, setScannerStatus] = useState<string>('Arahkan kamera ke barcode barang...');
   const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
   const isHandlingScanRef = useRef<boolean>(false);
 
@@ -406,13 +415,21 @@ export default function KasirFrozenPro() {
     }
   };
 
+  // --- DAFTAR KATEGORI GABUNGAN (BAWAAN + KATEGORI BARANG) ---
+  const availableCategories = Array.from(
+    new Set([
+      ...DEFAULT_CATEGORIES,
+      ...products.map((p) => p.category).filter(Boolean),
+    ])
+  );
+
   // --- KELOLA BARANG & STOK ---
   const openAddProduct = () => {
     setEditingProduct(null);
     setProductForm({
       name: '',
       barcode: '',
-      category: 'Nugget & Olahan Ayam',
+      category: availableCategories[0] || 'Nugget & Olahan Ayam',
       unit: 'Pack',
       buy_price: '',
       sell_price: '',
@@ -440,10 +457,11 @@ export default function KasirFrozenPro() {
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanBarcode = productForm.barcode.trim();
+    const cleanCategory = productForm.category.trim() || 'Umum';
     const payload = {
       name: productForm.name.trim(),
       barcode: cleanBarcode || null,
-      category: productForm.category,
+      category: cleanCategory,
       unit: productForm.unit,
       buy_price: Number(productForm.buy_price),
       sell_price: Number(productForm.sell_price),
@@ -867,7 +885,7 @@ export default function KasirFrozenPro() {
                   <div>
                     <h2 className="text-base font-bold text-slate-900">Daftar &amp; Stok Barang</h2>
                     <p className="text-xs text-slate-500">
-                      Atur barcode, harga modal, harga jual, dan jumlah stok
+                      Atur kategori, barcode, harga modal, harga jual, dan jumlah stok
                     </p>
                   </div>
                   <button
@@ -1410,7 +1428,7 @@ export default function KasirFrozenPro() {
       )}
 
       {/* =========================================================
-          MODAL 2: TAMBAH / EDIT BARANG
+          MODAL 2: TAMBAH / EDIT BARANG + KATEGORI BEBAS
       ========================================================= */}
       {showProductModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
@@ -1454,19 +1472,23 @@ export default function KasirFrozenPro() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Kategori</label>
-                  <select
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Kategori (Pilih atau Ketik Baru)
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    list="kategori-barang-list"
+                    placeholder="Ketik kategori baru..."
                     value={productForm.category}
                     onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
                     className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg"
-                  >
-                    <option value="Nugget & Olahan Ayam">Nugget &amp; Olahan Ayam</option>
-                    <option value="Sosis">Sosis</option>
-                    <option value="Seafood & Steamboat">Seafood &amp; Steamboat</option>
-                    <option value="Dimsum & Bakpao">Dimsum &amp; Bakpao</option>
-                    <option value="Kentang & Camilan">Kentang &amp; Camilan</option>
-                    <option value="Daging Olahan">Daging Olahan</option>
-                  </select>
+                  />
+                  <datalist id="kategori-barang-list">
+                    {availableCategories.map((cat) => (
+                      <option key={cat} value={cat} />
+                    ))}
+                  </datalist>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1">Satuan</label>
