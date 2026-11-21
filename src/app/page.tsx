@@ -1126,21 +1126,53 @@ export default function KasirFrozenPro() {
             )}
 
             {/* =========================================================
-                TAB 4: LAPORAN LABA RUGI & PENJUALAN
+                TAB 4: LAPORAN LABA RUGI, BARANG KELUAR & STOK
             ========================================================= */}
             {activeTab === 'laporan' && (
               <div className="space-y-6">
-                <ProfitLossBackupModal
-                  transactions={transactions}
-                  products={products}
-                  storeName="FROZENPRO POS"
-                />
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <ProfitLossBackupModal
+                    transactions={transactions}
+                    products={products}
+                    mutations={mutations}
+                    storeName="FROZENPRO POS"
+                  />
+                  <div className="rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-medium text-slate-700 shadow-2xs">
+                    Waktu Sekarang:{' '}
+                    <span className="font-semibold text-slate-900">
+                      {formatTanggalIndo(new Date().toISOString())} WIB
+                    </span>
+                  </div>
+                </div>
 
                 <div className="bg-white p-4 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
-                    <h2 className="text-base font-bold text-slate-900">Laporan Laba Rugi</h2>
+                    <h2 className="text-base font-bold text-slate-900">
+                      Laporan Laba Rugi, Barang Keluar &amp; Stok
+                    </h2>
                     <p className="text-xs text-slate-500">
-                      Kalkulasi otomatis omzet penjualan dikurangi harga modal (HPP)
+                      Periode terpilih:{' '}
+                      <span className="font-semibold text-slate-800">
+                        {reportStartDate
+                          ? new Intl.DateTimeFormat('id-ID', {
+                              day: '2-digit',
+                              month: 'long',
+                              year: 'numeric',
+                            }).format(new Date(`${reportStartDate}T00:00:00`))
+                          : '-'}{' '}
+                        00:00 WIB
+                      </span>{' '}
+                      s/d{' '}
+                      <span className="font-semibold text-slate-800">
+                        {reportEndDate
+                          ? new Intl.DateTimeFormat('id-ID', {
+                              day: '2-digit',
+                              month: 'long',
+                              year: 'numeric',
+                            }).format(new Date(`${reportEndDate}T23:59:59`))
+                          : '-'}{' '}
+                        23:59 WIB
+                      </span>
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1160,7 +1192,7 @@ export default function KasirFrozenPro() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="bg-white p-5 rounded-xl border border-slate-200">
                     <div className="flex items-center justify-between text-slate-500 mb-2">
                       <span className="text-xs font-semibold uppercase">Total Omzet Penjualan</span>
@@ -1176,7 +1208,7 @@ export default function KasirFrozenPro() {
 
                   <div className="bg-white p-5 rounded-xl border border-slate-200">
                     <div className="flex items-center justify-between text-slate-500 mb-2">
-                      <span className="text-xs font-semibold uppercase">Total Modal (HPP)</span>
+                      <span className="text-xs font-semibold uppercase">Modal Terjual (HPP)</span>
                       <Receipt className="w-5 h-5 text-amber-600" />
                     </div>
                     <p className="text-2xl font-bold text-slate-900">{formatRupiah(totalCOGS)}</p>
@@ -1196,6 +1228,25 @@ export default function KasirFrozenPro() {
                       {totalRevenue > 0 ? Math.round((totalNetProfit / totalRevenue) * 100) : 0}%
                     </p>
                   </div>
+
+                  <div className="bg-white p-5 rounded-xl border border-slate-200">
+                    <div className="flex items-center justify-between text-slate-500 mb-2">
+                      <span className="text-xs font-semibold uppercase">Stok Toko &amp; Modal</span>
+                      <Package className="w-5 h-5 text-red-600" />
+                    </div>
+                    <p className="text-xl font-bold text-slate-900">
+                      {products.reduce((sum, p) => sum + (Number(p.stock) || 0), 0)} unit
+                    </p>
+                    <p className="text-xs font-semibold text-red-600 mt-1">
+                      Modal Stok:{' '}
+                      {formatRupiah(
+                        products.reduce(
+                          (sum, p) => sum + (Number(p.stock) || 0) * (Number(p.buy_price) || 0),
+                          0
+                        )
+                      )}
+                    </p>
+                  </div>
                 </div>
 
                 <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
@@ -1207,10 +1258,10 @@ export default function KasirFrozenPro() {
                       <thead>
                         <tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase">
                           <th className="py-3 px-4">No. Invoice</th>
-                          <th className="py-3 px-4">Tanggal</th>
+                          <th className="py-3 px-4">Tanggal &amp; Jam</th>
                           <th className="py-3 px-4">Pelanggan</th>
-                          <th className="py-3 px-4">Metode</th>
                           <th className="py-3 px-4 text-right">Total Omzet</th>
+                          <th className="py-3 px-4 text-right">HPP</th>
                           <th className="py-3 px-4 text-right">Laba</th>
                         </tr>
                       </thead>
@@ -1222,29 +1273,96 @@ export default function KasirFrozenPro() {
                             </td>
                           </tr>
                         ) : (
-                          filteredTransactions.map((t) => (
-                            <tr key={t.id} className="hover:bg-slate-50">
-                              <td className="py-3 px-4 font-semibold text-slate-900">
-                                {t.invoice_no}
-                              </td>
-                              <td className="py-3 px-4 text-xs text-slate-500">
-                                {formatTanggalIndo(t.created_at)}
-                              </td>
-                              <td className="py-3 px-4 text-slate-700">{t.customer_name}</td>
-                              <td className="py-3 px-4">
-                                <span className="px-2 py-0.5 text-xs rounded bg-slate-100 text-slate-700 font-medium">
-                                  {t.payment_method}
-                                </span>
-                              </td>
-                              <td className="py-3 px-4 text-right font-semibold text-slate-900">
-                                {formatRupiah(t.total_amount)}
-                              </td>
-                              <td className="py-3 px-4 text-right font-bold text-emerald-600">
-                                +{formatRupiah(t.total_profit)}
-                              </td>
-                            </tr>
-                          ))
+                          filteredTransactions.map((t) => {
+                            const trxHpp = Math.max(
+                              0,
+                              Number(t.total_amount) - Number(t.total_profit)
+                            );
+                            return (
+                              <tr key={t.id} className="hover:bg-slate-50">
+                                <td className="py-3 px-4 font-semibold text-slate-900">
+                                  {t.invoice_no}
+                                </td>
+                                <td className="py-3 px-4 text-xs text-slate-500">
+                                  {formatTanggalIndo(t.created_at)}
+                                </td>
+                                <td className="py-3 px-4 text-slate-700">{t.customer_name}</td>
+                                <td className="py-3 px-4 text-right font-semibold text-slate-900">
+                                  {formatRupiah(t.total_amount)}
+                                </td>
+                                <td className="py-3 px-4 text-right text-slate-600">
+                                  {formatRupiah(trxHpp)}
+                                </td>
+                                <td className="py-3 px-4 text-right font-bold text-emerald-600">
+                                  +{formatRupiah(t.total_profit)}
+                                </td>
+                              </tr>
+                            );
+                          })
                         )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                  <div className="p-4 border-b border-slate-200">
+                    <h3 className="text-sm font-bold text-slate-900">
+                      Barang Keluar / Retur Supplier &amp; Harga Modal (HPP)
+                    </h3>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase">
+                          <th className="py-3 px-4">Tanggal &amp; Jam</th>
+                          <th className="py-3 px-4">Jenis</th>
+                          <th className="py-3 px-4">Produk</th>
+                          <th className="py-3 px-4 text-center">Qty</th>
+                          <th className="py-3 px-4 text-right">Harga Modal</th>
+                          <th className="py-3 px-4 text-right">Total Modal</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-sm">
+                        {mutations
+                          .filter((m) => {
+                            if (m.type !== 'KELUAR' && m.type !== 'RETUR_SUPPLIER') return false;
+                            const mutDate = m.created_at.split('T')[0];
+                            if (reportStartDate && mutDate < reportStartDate) return false;
+                            if (reportEndDate && mutDate > reportEndDate) return false;
+                            return true;
+                          })
+                          .map((m) => {
+                            const prod = products.find(
+                              (p) =>
+                                p.id === m.product_id ||
+                                p.name.toLowerCase() === m.product_name.toLowerCase()
+                            );
+                            const modalSatuan = Number(prod?.buy_price) || 0;
+                            const totalModal = modalSatuan * (Number(m.qty) || 0);
+                            return (
+                              <tr key={m.id} className="hover:bg-slate-50">
+                                <td className="py-3 px-4 text-xs text-slate-500">
+                                  {formatTanggalIndo(m.created_at)}
+                                </td>
+                                <td className="py-3 px-4 text-xs font-semibold text-amber-700">
+                                  {m.type.replace('_', ' ')}
+                                </td>
+                                <td className="py-3 px-4 font-medium text-slate-900">
+                                  {m.product_name}
+                                </td>
+                                <td className="py-3 px-4 text-center font-bold text-red-600">
+                                  -{m.qty}
+                                </td>
+                                <td className="py-3 px-4 text-right text-slate-600">
+                                  {formatRupiah(modalSatuan)}
+                                </td>
+                                <td className="py-3 px-4 text-right font-semibold text-slate-900">
+                                  {formatRupiah(totalModal)}
+                                </td>
+                              </tr>
+                            );
+                          })}
                       </tbody>
                     </table>
                   </div>
